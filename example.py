@@ -17,8 +17,9 @@ on1 = [
        'col_groups'
       ]
 
-col_groups1 = ['사업_부처명',
-             #  '사업_부처명m',
+col_groups1 = [
+    #'사업_부처명',
+               '사업_부처명m',
              #  '연구수행주체',
              #  '지역', '지역2', '지역3',
              #  '6T관련기술-대', '과학기술표준분류1-대', '중점과학기술분류-대',
@@ -28,9 +29,11 @@ col_groups1 = ['사업_부처명',
              #  '연구비_등급1', '연구비_등급2', '연구비_등급4'
                ]
 
-fig_list = ntis1.make_pdf(filename_prefix='ministry1', # 한글 작성시 조심
+fig_list = ntis1.make_pdf(filename_prefix='ministry2', # 한글 작성시 조심
                           #col_groups_fund=['연구비_등급1', '연구비_등급2', '연구비_등급4'],
                           col_groups=col_groups1,
+                          color_map='Set3',
+
                           onoff_condition=on1)
 
 t2 = time.time() - t1

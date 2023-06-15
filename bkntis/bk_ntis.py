@@ -902,7 +902,7 @@ class NTIS():
             df_g = df_null_count.loc[col_group, :]
             fig0 = bgp.make_graph_bar2(df_g,
                                   width=0.5,
-                                  title=f'{fig_no}-1 {col_group} 널 데이터 현황(null data) ',
+                                  title=f'{fig_no}-0 {col_group} 널 데이터 현황(null data) ',
                                   precision=1,
                                   orientation='v',
                                   # height=1800,
@@ -920,12 +920,12 @@ class NTIS():
                     output=output,
                     filename_prefix=filename,
                     PY=PY,
-                    fig_no=fig_no, year1=year1, year2=year2, width=width, height=height,
+                    fig_no=f"{fig_no}m", year1=year1, year2=year2, width=width, height=height,
                     figsize=figsize, plot_bgcolor=plot_bgcolor, color_map=color_map,
                     title_font_size=title_font_size,
                     text_cagr_font_size=text_cagr_font_size,
                     width_string=width_string,
-                    agg_function='sum',  fig_start_no=2)
+                    agg_function='sum',  fig_start_no=1)
             fig_list.extend(fig_list1)
 
         if include_count_sum in ['count', 'both']:
@@ -936,12 +936,12 @@ class NTIS():
                                  output=output,
                                  filename_prefix=filename,
                                  PY=PY,
-                                 fig_no=fig_no, year1=year1, year2=year2, width=width, height=height,
+                                 fig_no=f"{fig_no}c", year1=year1, year2=year2, width=width, height=height,
                                  figsize=figsize, plot_bgcolor=plot_bgcolor, color_map=color_map,
                                  title_font_size=title_font_size,
                                  text_cagr_font_size=text_cagr_font_size,
                                  width_string=width_string,
-                                 agg_function='count', fig_start_no=no_fig_list+1)
+                                 agg_function='count', fig_start_no=1) #no_fig_list+1)
             fig_list.extend(fig_list2)
 
         # file name 이 문자열로 입력되어 있다면 파일로 저장해 주기
@@ -1000,9 +1000,11 @@ class NTIS():
             memo1 = '과제당 연구비(억원)'
 
             df_table = df_raw.groupby([col_group, PY])[col_fund2].agg(agg_function).unstack(fill_value=0)
-            s_sum1 = df_table.sum(axis=1)
+
             df_table_no1 = df_table.loc[:, year1:year2]
             df_table_no2 = df_table_no1[df_table_no1.sum(axis=1) > 0]
+            s_sum1 = df_table.sum(axis=1)
+            s_sum2 = df_table_no2.sum(axis=1)
         else:
             name1 = '과제수'
 
@@ -1014,9 +1016,11 @@ class NTIS():
             unit2 = '개'
             memo1 = '1억당 과제수(개)'
             df_table = df_raw.groupby([col_group, PY])[col_fund].agg(agg_function).unstack(fill_value=0)
-            s_sum1 = df_table.sum(axis=1)
             df_table_no1 = df_table.loc[:, year1:year2]
             df_table_no2 = df_table_no1[df_table_no1.sum(axis=1) > 0]
+            s_sum1 = df_table.sum(axis=1)
+            s_sum2 = df_table_no2.sum(axis=1)
+
 
 
         fig = bgp.make_graph_line(df=df_graph,
@@ -1091,7 +1095,7 @@ class NTIS():
                                    opacity=0.8,
                                    reversed=True,
                                    unit=unit1,
-                                   title=f"{fig_no}_{fig_start_no} {col_group} {name1} 추이",
+                                   title=f"{fig_no}_{fig_start_no} {col_group} {name1} 추이 (group)",
                                    title_font_size=title_font_size,
                                    yaxes_title=f'{name1} ({unit1})',
                                    color_map=color_map,
@@ -1107,7 +1111,7 @@ class NTIS():
                                   opacity=0.8,
                                   reversed=True,
                                   unit=unit1,
-                                  title=f"{fig_no}_{fig_start_no} {col_group} {name1} 추이",
+                                  title=f"{fig_no}_{fig_start_no} {col_group} {name1} 누적 추이 (stack)",
                                   title_font_size=title_font_size,
                                   yaxes_title=f'{name1} ({unit1})',
                                   color_map=color_map,
@@ -1121,22 +1125,36 @@ class NTIS():
 
         fig = bgp.make_pie(values=s_sum1,
                            labels=s_sum1.index,
-                           text1=f"Total({name1})",
+                           text1=f"{name1}<br>(전체)",
                            unit=unit1,
                            # pull_index=[6],
                            # pull_index_ratio=0.1,
                            # pull_index_ratio_default=0.01,
-                           title=f"{fig_no}-{fig_start_no} {col_group} {name1}",
+                           title=f"{fig_no}-{fig_start_no} {col_group} {name1} (전체)",
                            title_font_size=title_font_size,
                            colormap_name=color_map,  # "tab20c",
                            figsize=figsize)
         fig_start_no += 1
         fig_list.append(fig)
+        if (year1 in df_table_no2.columns) and (year2 in df_table_no2.columns):
+            fig = bgp.make_pie(values=s_sum2,
+                           labels=s_sum2.index,
+                           text1=f"{name1}<br>({year1}-{year2})",
+                           unit=unit1,
+                           # pull_index=[6],
+                           # pull_index_ratio=0.1,
+                           # pull_index_ratio_default=0.01,
+                           title=f"{fig_no}-{fig_start_no} {col_group} {name1} ({year1}~{year2})",
+                           title_font_size=title_font_size,
+                           colormap_name=color_map,  # "tab20c",
+                           figsize=figsize)
+            fig_start_no += 1
+            fig_list.append(fig)
 
         if year1 in df_table_no2.columns:
             fig = bgp.make_pie(values=df_table_no2[year1],
                             labels=df_table_no2.index,
-                            text1=f"{year1}",
+                            text1=f"{name1}<br>({year1})",
                             unit=unit1,
                             # pull_index=[6],
                             # pull_index_ratio=0.1,
@@ -1151,7 +1169,7 @@ class NTIS():
         if year2 in df_table_no2.columns:
             fig = bgp.make_pie(values=df_table_no2[year2],
                             labels=df_table_no2.index,
-                            text1=f"{year2}",
+                            text1=f"{name1}<br>({year2})",
                             unit=unit1,
                             # pull_index=[6],
                             # pull_index_ratio=0.1,
@@ -1728,7 +1746,8 @@ class NTIS():
             return None
 
 
-    def make_pdf(self, year1=2018, year2=2021, PY='제출년도', filename_prefix='', color_map='tab20c', figsize=(800,600),
+    def make_pdf(self, year1=2018, year2=2021, PY='제출년도', filename_prefix='',
+                 color_map='tab20c', figsize=(800,600),
                 col_fund1='정부연구비_조',
                 col_fund2='정부연구비_억',
                 col_groups_fund=['연구비_등급1'],  # , '연구비_등급2', '연구비_등급4'],
@@ -1832,7 +1851,7 @@ class NTIS():
         for fn in sorted(filenames):
             merger.append(fn)
 
-        fname2 = bu.make_new_name(f'total_{filename_prefix}', 'pdf')
+        fname2 = bu.make_new_name(f'total_{filename_prefix}_{color_map}', 'pdf')
         merger.write(fname2)
         merger.close()
         print(f" *** {fname2} was created ! *** ")
