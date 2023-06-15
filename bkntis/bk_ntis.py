@@ -913,7 +913,7 @@ class NTIS():
             #fig.write_image(prefix + f'_null_{col_group1}.pdf')
             fig_list.append(fig0)
 
-        if include_count_sum == 'money':
+        if include_count_sum in ['money', 'both'] :
             fig_list1 = self.plot_2a(col_group=col_group,
                     col_fund=col_fund,
                     col_fund2=col_fund2,
@@ -926,13 +926,11 @@ class NTIS():
                     text_cagr_font_size=text_cagr_font_size,
                     width_string=width_string,
                     agg_function='sum',  fig_start_no=2)
-
             fig_list.extend(fig_list1)
 
-        no_fig_list = len(fig_list)
-
-        #
-        fig_list2 = self.plot_2a(col_group=col_group,
+        if include_count_sum in ['count', 'both']:
+            no_fig_list = len(fig_list)
+            fig_list2 = self.plot_2a(col_group=col_group,
                                  col_fund=col_fund,
                                  col_fund2=col_fund2,
                                  output=output,
@@ -944,7 +942,7 @@ class NTIS():
                                  text_cagr_font_size=text_cagr_font_size,
                                  width_string=width_string,
                                  agg_function='count', fig_start_no=no_fig_list+1)
-        fig_list.extend(fig_list2)
+            fig_list.extend(fig_list2)
 
         # file name 이 문자열로 입력되어 있다면 파일로 저장해 주기
         if (output == 'file') or (filename != ''):

@@ -19,17 +19,9 @@ from matplotlib import cm
 import matplotlib.colors as mcolor
 from PyPDF2 import PdfMerger 
 
-
 sys.path.append("/Users/bk/Dropbox/bkmodule2019/")
 
 import bk_util as bu
-
-def deco1(func):
-    @functools.wraps(func)
-    def wrap(*args, **kwargs):
-        print( f"\n>>> {func.__name__}( )")
-        return func(*args, **kwargs)
-    return wrap
 
 raw_symbols = SymbolValidator().values
 
@@ -1937,8 +1929,6 @@ def make_graph_horizontal_bar(df=None,
     return fig
 
 
-# 저장
-@deco1
 def save_fig_to_pdf(fig_total: list,
                     fig_name_prefix='',
                     year_begin='',
