@@ -17,7 +17,7 @@ if __name__ == "__main__":
         author_email='stsboongkee@gmail.com',
         description=description,
         keywords=keywords,
-        install_requires=install_requires,
-        python_requires=">=3.10",
+        #install_requires=install_requires,
+        #python_requires=">=3.10",
     )
 
