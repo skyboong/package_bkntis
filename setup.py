@@ -1,12 +1,23 @@
 from setuptools import setup
 
-setup(
-    name='bkntis',
-    version='0.0.1',
-    packages=['bkntis'],
-    url='https://github.com/skyboong/package_bkntis',
-    license='GNU GENERAL PUBLIC LICENSE V3',
-    author='B K Choi',
-    author_email='stsboongkee@gmail.com',
-    description='This is a specialized analysis tool for analyzing national research and development investment amounts in South Korea.'
-)
+name = 'bkntis'
+packages = ['bkntis']
+keywords = ['R&D Investment', "R&D Funding"]
+description = 'Python package for analyzing and visualizing the R&D investment in South Korea.'
+install_requires = ['pandas', 'plotly','matplotlib','XlsxWriter','PyPDF2']
+
+if __name__ == "__main__":
+    setup(
+        name=name,
+        version='0.0.1',
+        packages=packages,
+        url='https://github.com/skyboong/package_bkntis',
+        license='GNU GENERAL PUBLIC LICENSE V3',
+        author='B K Choi',
+        author_email='stsboongkee@gmail.com',
+        description=description,
+        keywords=keywords,
+        install_requires=install_requires,
+        python_requires=">=3.10",
+    )
+
