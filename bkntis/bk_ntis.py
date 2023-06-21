@@ -1,7 +1,12 @@
-# 2022.4.13(Wed)
+"""
+NITS를 분석하는 기본 클래스를 정의한다.
+2022.4.13(Wed)
+2023.6.19(Mon)
 
+"""
 import sys
-sys.path.append("/Users/bk/Dropbox/bkmodule2019/")
+#sys.path.append("/Users/bk/Dropbox/bkmodule2019/")
+
 import os
 import glob
 import time
@@ -15,6 +20,7 @@ from plotly.validators.scatter.marker import SymbolValidator
 from matplotlib import cm
 import matplotlib.colors as mcolor
 from PyPDF2 import PdfMerger 
+
 
 import bk_util as bu
 import bk_ntis_find as bnf
@@ -58,6 +64,7 @@ class NTIS():
 
         if df is not None:
             self.df = df.copy()
+            print(f"df's shape = {df.shape}")
         elif filename is not None:
 
             root, ext = os.path.splitext(filename)
@@ -67,7 +74,7 @@ class NTIS():
                 case '.csv':
                     self.df = pd.read_csv(filename, index_col=0) # 인덱스 읽지 않기
                 case _:
-                    print('입력파일이 없군요. 입력 파일 이름을 확인해 주세요')
+                    print('입력 파일이 없군요. 입력 파일 이름을 확인해 주세요')
                     return None
         else:
             pass
@@ -89,10 +96,85 @@ class NTIS():
         else:
             return 0
 
+    def filtering(self, id_list=[], colname='과제고유번호'):
+        """필터링 부문"""
+        if self.df is not None:
+            print("<<필터링 결과>>")
+            print(f"* 입력한 과제고유번호 개수는 {len(id_list):,}개이며, 이중에서 유니크한 것은 {len(set(id_list)):,}개 이다.")
+            onoff1 = self.df[colname].isin(id_list)
+            df1 = self.df[onoff1].copy()
+            print(f"* 전체 과제수는 {self.df.shape[0]:,}개이며, 입력한 {colname} 리스트를 적용하여 {df1.shape[0]:,}개로 필터링하였다.")
+            set1 = set(id_list) - set(self.df[colname].tolist())
+            print(f"* 전체 과제에 포함되지 않은 입력한 과제번호 개수는 {len(set1):,}개 이다.")
+            return df1
 
-    def import_performance_data(self, df):
-        self.df_performance = df
-        print(f"* imported {self.df_performance.shape[0]:,}개 임포트 완료하였습니다.")
+    def import_file(self, filename=None):
+        """파일 불러오는 메소드"""
+        if filename is not None:
+            root, ext = os.path.splitext(filename)
+            match ext :
+                case '.pkl':
+                    df = pd.read_pickle(filename)
+                case '.csv':
+                    df = pd.read_csv(filename, index_col=0) # 인덱스 읽지 않기
+                case _:
+                    df = None
+                    print('입력 파일이 없군요. 입력 파일 이름을 확인해 주세요')
+            return df
+
+    def import_performance_data(self, filename=None, df=None, kind=1):
+        if df is not None:
+            self.df_performance = df
+        else:
+            if kind == 1 :
+                df = self.import_file(filename=filename)
+                if df is not None:
+                    self.df_performance = df
+                    print(f"* imported {self.df_performance.shape[0]:,}개 임포트 완료하였습니다.")
+                    df_raw1 = df
+                    # 보안과제 정보 알려주기
+                    ## 체크 : 보안과제 제외, 전체 논문수 대비 보안과제 논문의 비율 체크
+
+                    a1 = len(df_raw1.index)
+
+                    onoff1 = df_raw1['성과발생년도'] != '보안과제의 성과정보'
+                    a2 = onoff1.sum()
+
+                    onoff_s = df_raw1['성과발생년도'] == '보안과제의 성과정보'
+                    a3 = onoff_s.sum()
+
+                    # 3116
+                    # 8437
+
+                    ## 체크 : 기여율, 기여율 0 제외
+
+                    onoff2 = df_raw1['기여율(확정)'] == 0
+                    a4 = onoff2.sum()
+
+                    onoff3 = df_raw1['기여율(확정)'] > 0
+                    a5 = onoff3.sum()
+
+                    # 보안과제가 아니고, 기여율도 0 초과하는 과제수는 ?
+                    onoff = onoff1 & onoff3
+                    a6 = onoff.sum()
+
+                    # 307513
+                    # 730741
+
+                    print(
+                        f"* 전체 논문({a1:,}건) 중 보안과제의 논문 {a3:,}건({100 * a3 / a1:.1f}%)과 "
+                        f"기여율 0% 논문 {a4:,}건({100 * a4 / a1:.1f}%)을 "
+                        f"제외한 논문 {a5:,}건({100 * a5 / a1:.1f}%)을 분석 대상으로 하였다.")
+
+                    self.df_performance2 = df_raw1[onoff].copy()
+
+                else:
+                    self.df_performance = None
+                    print("* imported None")
+            else:
+                self.df_performance = None
+
+
 
 
     def show_info(self):
@@ -1188,9 +1270,10 @@ class NTIS():
                 fig.show()
         elif output == 'file':
             for i, fig in enumerate(fig_list, start=1):
-                fn = filename_prefix + f'_{i:02d}.pdf'
-                fig.write_image(fn)
-                #print(f"{fn} was saved")
+                if fig is not None: # fig None 일 때 처리 2023.6.20
+                    fn = filename_prefix + f'_{i:02d}.pdf'
+                    fig.write_image(fn)
+                    #print(f"{fn} was saved")
 
         return fig_list
 
@@ -1466,9 +1549,12 @@ class NTIS():
                 fn = filename + f'_{i:02d}.pdf'
                 fig.write_image(fn)
 
-    def plot_null_data(self, filename='ntis_null', PY='제출년도', TF_merger=False, TF_fig=True, fig_no=1):
+    def plot_null_data(self, filename='ntis_null', PY='제출년도', TF_merger=False, TF_fig=True, fig_no=1, precision=3)->DataFrame:
         figsize = (1000, 1800)
-        df_raw = self.df.copy()
+        if self.df is not None:
+            df_raw = self.df.copy()
+        else:
+            return None
 
         s_null = (~df_raw.isnull()).sum() / len(df_raw.index) * 100
         #s_null
@@ -1477,6 +1563,17 @@ class NTIS():
         df_temp = DataFrame(s_null)
         df_temp.index = [f"{i:3d} {each}" for i, each in enumerate(df_temp.index, start=1)]
         df_temp2 = df_temp.sort_index(ascending=False)
+
+        s_null = (df_raw.isnull()).sum() / len(df_raw.index) * 100
+        # s_null
+        # s_null2 = s_null[s_null>0]
+        # s_null2
+        df_temp = DataFrame(s_null)
+        df_temp.index = [f"{i:3d} {each}" for i, each in enumerate(df_temp.index, start=1)]
+        df_temp3 = df_temp.sort_index(ascending=False)
+        # null 이 0인 것은 제외하기
+        df_temp4 = df_temp3[~(df_temp3.loc[:,0]==0)]
+
         # df_temp2
         size = 15
         if TF_fig == True:
@@ -1484,7 +1581,7 @@ class NTIS():
                                   width=0.5,
                                   title=f'{fig_no}-1 데이터 비율(전체)',
                                   title_sub=f'<span style="font-size: {size}px;">{df_raw.shape[0]:,}개, {len(s_null.index)}개 항목</span>',
-                                  precision=1,
+                                  precision=precision,
                                   orientation='h',
                                   tickfont_size=5,
                                   unit=" % ",
@@ -1492,6 +1589,20 @@ class NTIS():
                                   # yaxes_title=f'널 비율(%) '
                                   )
             fig.write_image(f'{filename}_1.pdf')
+
+            fig = bgp.make_graph_bar2(df_temp4,
+                                      width=0.5,
+                                      title=f'{fig_no}-2 널 존재하는 컬럼 추출 - 데이터 비율(전체)',
+                                      title_sub=f'<span style="font-size: {size}px;">{df_raw.shape[0]:,}개, {len(df_temp4.index)}개 항목</span>',
+                                      precision=precision,
+                                      orientation='h',
+                                      tickfont_size=5,
+                                      unit=" % ",
+                                      figsize=figsize,
+                                      # yaxes_title=f'널 비율(%) '
+                                      )
+            fig.write_image(f'{filename}_2.pdf')
+
 
         # null data
         #PY = '제출년도'
@@ -1517,7 +1628,7 @@ class NTIS():
 
         if TF_fig == True:
             df_fig = df_count4
-            fig = bgp.make_heatmap(title=f"{fig_no}-2 데이터 비율(연도별 : {Y1}~{Y2})",
+            fig = bgp.make_heatmap(title=f"{fig_no}-3 데이터 비율(연도별 : {Y1}~{Y2})",
                                df=df_fig,
                                colorscale='blues',  # 'greens',
                                textfont_size=3,
@@ -1532,11 +1643,11 @@ class NTIS():
                                # x_min=1998,
                                # x_max=2021,
                                )
-            fig.write_image(f'{filename}_2.pdf')
+            fig.write_image(f'{filename}_3.pdf')
 
         if (TF_fig == True) and (TF_merger == True):
             merger = PdfMerger()
-            for fn in sorted([f'{filename}_1.pdf', f'{filename}_2.pdf']):
+            for fn in sorted([f'{filename}_1.pdf', f'{filename}_2.pdf', f'{filename}_3.pdf']):
                 merger.append(fn)
             fname2 = bu.make_new_name(f'total_{filename}', 'pdf')
             merger.write(fname2)
@@ -1547,164 +1658,6 @@ class NTIS():
 
 
 
-
-    def make_pdf_old1(self, year1=2018, year2=2020, PY='제출년도', prefix='', color_map='tab20c', figsize=(800,600)):
-        print(">>> make_pdf()")
-
-        Y1 = year1
-        Y2 = year2
-
-        # 전체 집행액, 과제수
-        fig_no = 1
-        self.plot_1a(col_fund='정부연구비_조', output='file', filename=f'{prefix}{fig_no:03d}_1정부연구비_집행액_과제수',
-                     PY='제출년도', title=f"{fig_no:03d}-1 정부 연구개발 집행액과 과제수",
-                     range_l=[0, 25], range_r=[10000, 100000], color_map=color_map, figsize=figsize
-                     )
-
-        self.plot_1b(col_fund = '정부연구비_억', output='file', filename=f'{prefix}{fig_no:03d}_2정부연구비_평균',
-                    PY = '제출년도', title = f"{fig_no:03d}-2 정부연구비(mean, median)",
-                    colname = ['mean', 'median'], precision = 1, color_map=color_map,figsize=figsize)
-
-        # 부처별 집행현황
-        fig_no += 1
-        col_group='사업_부처명m'
-        self.plot_2(col_group=col_group, output='file', filename=f'{prefix}{fig_no:03d}_1{col_group}',
-                    fig_no=fig_no, color_map=color_map, figsize=figsize)
-
-        fig_no += 1
-        self.plot_5_horizontal_bar(col_group=col_group,
-                                   width=0.2, output='file', filename=f'{prefix}{fig_no:03d}_2{col_group}',
-                                   year1=Y1, year2=Y2,
-                                   fig_no=fig_no,
-                                   title1=f'부처별 추이',
-                                   title2=f'부처별 비중',
-                                   color_map=color_map,
-                                   figsize=figsize)
-
-        # 수행주체별 집행현황
-        fig_no += 1
-        self.plot_2(col_group='연구수행주체', output='file', filename=f'{prefix}{fig_no:03d}_1연구수행주체',
-                    fig_no=fig_no, figsize=figsize)
-        self.plot_5_horizontal_bar(col_group='연구수행주체',
-                                   width=0.2, output='file', filename=f'{prefix}{fig_no:03d}_2연구수행주체',
-                                   year1=Y1, year2=Y2,
-                                   fig_no=fig_no,
-                                   title1=f'연구수행주체별 추이',
-                                   title2=f'연구수행주체별 비중',
-                                   figsize=figsize)
-
-        # 지역별
-        fig_no +=1
-        self.plot_2(col_group='지역2', output='file', filename=f'{prefix}{fig_no:03d}_1지역2',
-                    fig_no=fig_no, figsize=figsize)
-        self.plot_5_horizontal_bar(col_group='지역2', width=0.2, output='file', filename=f'{prefix}{fig_no:03d}_2지역2',
-                                   year1=Y1, year2=Y2,
-                                   fig_no=fig_no,
-                                   title1=f'지역별 추이',
-                                   title2=f'지역별 비중',
-                                   color_map=color_map,
-                                   figsize=figsize)
-
-        # 연구비 등급
-        fig_no += 1
-        col_group = '연구비_등급1'
-        self.plot_2(col_group=col_group, output='file', filename=f'{prefix}{fig_no:03d}_1{col_group}', fig_no=fig_no)
-        self.plot_5_horizontal_bar(col_group=col_group, width=0.2, output='file', filename=f'{prefix}{fig_no:03d}_2{col_group}',
-                                   year1=Y1, year2=Y2,
-                                   fig_no=fig_no,
-                                   title1=f'{col_group} 추이',
-                                   title2=f'{col_group} 비중',
-                                   color_map=color_map,
-                                   figsize=figsize)
-
-        fig_no += 1
-        col_group = '연구비_등급2'
-        self.plot_2(col_group=col_group, output='file', filename=f'{prefix}{fig_no:03d}_1{col_group}', fig_no=fig_no)
-        self.plot_5_horizontal_bar(col_group=col_group, width=0.2, output='file',
-                                   filename=f'{prefix}{fig_no:03d}_2{col_group}',
-                                   year1=Y1, year2=Y2,
-                                   fig_no=fig_no,
-                                   title1=f'{col_group} 추이',
-                                   title2=f'{col_group} 비중',
-                                   color_map=color_map)
-
-        #self.plot_3(col_group='연구비_등급4', output='file', filename=f'{prefix}{fig_no:03d}_2연구비_등급4')
-
-
-
-        # 기술분야별 집행현황 : 6T, 과학기술표준분류1-대, 중점과학기술분류-대
-        fig_no += 1
-        col_group = '6T관련기술-대'
-        self.plot_5_horizontal_bar(col_group=col_group, width=0.2, output='file', filename=f'{prefix}{fig_no:03d}_{col_group}',
-                                   year1=Y1, year2=Y2,
-                                   fig_no=fig_no,
-                                   title1=f'{col_group} 추이',
-                                   title2=f'{col_group} 비중',
-                                   color_map=color_map,
-                                   )
-
-        fig_no += 1
-        col_group = '과학기술표준분류1-대'
-        self.plot_5_horizontal_bar(col_group=col_group, width=0.2, output='file', filename=f'{prefix}{fig_no:03d}_{col_group}',
-                                   year1=Y1, year2=Y2,
-                                   fig_no=fig_no,
-                                   title1=f'{col_group} 추이',
-                                   title2=f'{col_group} 비중',
-                                   color_map=color_map)
-
-        fig_no += 1
-        col_group = '중점과학기술분류-대'
-        self.plot_5_horizontal_bar(col_group=col_group, width=0.2, output='file',
-                                   filename=f'{prefix}{fig_no:03d}_{col_group}',
-                                   year1=Y1, year2=Y2,
-                                   fig_no=fig_no,
-                                   title1=f'{col_group} 추이',
-                                   title2=f'{col_group} 비중',
-                                   color_map=color_map)
-
-
-        # 보안 과제
-        fig_no += 1
-        col_group='연구개발단계'
-        self.plot_2(col_group=col_group, output='file', filename=f'{prefix}{fig_no:03d}_1{col_group}', fig_no=fig_no, color_map=color_map)
-        self.plot_5_horizontal_bar(col_group=col_group, width=0.2, output='file',
-                                   filename=f'{prefix}{fig_no:03d}_{col_group}',
-                                   year1=Y1, year2=Y2,
-                                   fig_no=fig_no,
-                                   title1=f'{col_group} 추이',
-                                   title2=f'{col_group} 비중',
-                                   height=400,
-                                   color_map=color_map,
-                                   figsize=figsize)
-
-        # 보안 과제
-        fig_no += 1
-        col_group='보안과제3'
-        self.plot_2(col_group=col_group, output='file', filename=f'{prefix}{fig_no:03d}_1{col_group}', fig_no=fig_no, color_map=color_map)
-        self.plot_5_horizontal_bar(col_group=col_group, width=0.2, output='file',
-                                   filename=f'{prefix}{fig_no:03d}_{col_group}',
-                                   year1=Y1, year2=Y2,
-                                   fig_no=fig_no,
-                                   title1=f'{col_group} 추이',
-                                   title2=f'{col_group} 비중',
-                                   height=400,
-                                   color_map=color_map)
-
-
-        # prefix로 시작하는 파일명 연결하기
-        filenames1 = glob.glob(f'{prefix}*.pdf')
-        filenames = sorted(filenames1)
-        #print("filenames = ", filenames)
-        # merger = PdfFileMerger() # 2023.4.27 수정
-        merger = PdfMerger()
-
-        for fn in sorted(filenames):
-            merger.append(fn)
-
-        fname2 = bu.make_new_name(f'{prefix}_total', 'pdf')
-        merger.write(fname2)
-        merger.close()
-        print(f"{fname2} was created !")
 
     def make_table_ptn(self, df=None,
                            column_index_list=['사업_부처명', '사업명', '내역사업명'],
@@ -1746,26 +1699,32 @@ class NTIS():
             return None
 
 
-    def make_pdf(self, year1=2018, year2=2021, PY='제출년도', filename_prefix='',
+    def make_pdf(self, filename_prefix='prefix_',
+                 year1=None, year2=None, PY='제출년도',
                  color_map='tab20c', figsize=(800,600),
                 col_fund1='정부연구비_조',
                 col_fund2='정부연구비_억',
                 col_groups_fund=['연구비_등급1'],  # , '연구비_등급2', '연구비_등급4'],
-                col_groups=['사업_부처명m',
-                            '연구수행주체',
-                            '지역', '지역2', '지역3',
-                            '6T관련기술-대', '과학기술표준분류1-대', '중점과학기술분류-대',
-                            '연구개발단계',
-                            '연구책임자성별',
-                            '보안과제3',
-                            '연구비_등급1', '연구비_등급2', '연구비_등급4'],
+                col_groups=[
+                          # '사업_부처명',
+                            '사업_부처명m',
+                          #  '연구수행주체',
+                            '과제수행기관명',
+                          #  '지역', '지역2', '지역3',
+                          #  '6T관련기술-대', '과학기술표준분류1-대', '중점과학기술분류-대',
+                          #  '연구개발단계',
+                          #  '연구책임자성별',
+                          #  '보안과제3',
+                          #  '연구비_등급1', '연구비_등급2', '연구비_등급4'
+                        ],
                  title_font_size=20,  text_cagr_font_size=10, width_string=200,
                  critical_number_list=[10,20,100], # 10억, 20억, 100억
                  range_l=None, range_r=None,
                  onoff_condition=['null', 'fund_trend1',
                                   'fund_histogram', 'fund_boxplot',
                                   'fund_trend2',
-                                  'col_groups']):
+                                  'col_groups'],
+                 onoff_name='A'):
         """
         2023.5.24
         2023.6.14
@@ -1773,7 +1732,22 @@ class NTIS():
         print(">>> make_pdf()")
         # 전체 집행액, 과제수
 
+        if year1 is None:
+            year1 = self.df[PY].min()
+        if year2 is None:
+            year2 = self.df[PY].max()
+
         fig_no_name = 'A1'
+
+        # 작업편의를 위해서 만듦
+        if onoff_name=='A':
+            onoff_condition = ['null', 'fund_trend1', 'fund_histogram', 'fund_boxplot']
+        elif onoff_name=='A1':
+            onoff_condition = ['null']
+        elif onoff_name == 'AB':
+            onoff_condition = ['null', 'fund_trend1', 'fund_histogram', 'fund_boxplot', 'col_groups']
+        elif onoff_name == 'B':
+            onoff_condition = ['col_groups']
 
         # 1 널 데이터 현황
         filename1 = f'{filename_prefix}{fig_no_name}_1_null_total'
@@ -1855,3 +1829,6 @@ class NTIS():
         merger.write(fname2)
         merger.close()
         print(f" *** {fname2} was created ! *** ")
+
+if __name__ == "__main__":
+    print("bk_ntis.py")
