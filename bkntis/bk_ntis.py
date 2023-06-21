@@ -26,7 +26,7 @@ from . import bk_util as bu
 from . import bk_ntis_find as bnf
 from . import bk_graph_plotly as bgp
 
-print("Test2 : bk_ntis.py")
+print("Test4 : 임포트 수정 : bk_ntis.py")
 
 col_group = '연구비_등급4'
 raw_symbols = SymbolValidator().values
