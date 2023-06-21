@@ -22,11 +22,11 @@ import matplotlib.colors as mcolor
 from PyPDF2 import PdfMerger 
 
 
-import bk_util as bu
-import bk_ntis_find as bnf
-import bk_graph_plotly as bgp
+from . import bk_util as bu
+from . import bk_ntis_find as bnf
+from . import bk_graph_plotly as bgp
 
-print("Test : bk_ntis.py")
+print("Test2 : bk_ntis.py")
 
 col_group = '연구비_등급4'
 raw_symbols = SymbolValidator().values
