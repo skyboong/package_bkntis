@@ -20,7 +20,7 @@ import matplotlib.colors as mcolor
 from PyPDF2 import PdfMerger 
 
 #sys.path.append("/Users/bk/Dropbox/bkmodule2019/")
-import bk_util as bu
+from ..util import bk_util as bu
 
 raw_symbols = SymbolValidator().values
 

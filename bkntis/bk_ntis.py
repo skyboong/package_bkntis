@@ -4,7 +4,6 @@ NITS를 분석하는 기본 클래스를 정의한다.
 2023.6.19(Mon)
 
 """
-import sys
 #sys.path.append("/Users/bk/Dropbox/bkmodule2019/")
 
 import os
@@ -13,18 +12,13 @@ import time
 
 import numpy as np
 import pandas as pd
-from pandas import DataFrame, Series
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+from pandas import DataFrame
 from plotly.validators.scatter.marker import SymbolValidator
-from matplotlib import cm
-import matplotlib.colors as mcolor
-from PyPDF2 import PdfMerger 
+from PyPDF2 import PdfMerger
 
-
-from . import bk_util as bu
-from . import bk_ntis_find as bnf
-from . import bk_graph_plotly as bgp
+from .graph import bk_graph_plotly as bgp
+from .util import bk_ntis_find as bnf
+from .util import bk_util as bu
 
 print("Test4 : 임포트 수정 : bk_ntis.py")
 
@@ -166,7 +160,10 @@ class NTIS():
                     print(
                         f"* 전체 논문({a1:,}건) 중 보안과제의 논문 {a3:,}건({100 * a3 / a1:.1f}%)과 "
                         f"기여율 0% 논문 {a4:,}건({100 * a4 / a1:.1f}%)을 "
-                        f"제외한 논문 {a5:,}건({100 * a5 / a1:.1f}%)을 분석 대상으로 하였다.")
+                        f"제외한 논문 {a5:,}건({100 * a5 / a1:.1f}%)을 분석 대상으로 하였다."
+                        f"(df_performance: 전체 raw data {self.df_performance.shape}, df_performance2 : 보안과제, 기여율 0 이상 논문 {self.df_performance2.shape})"
+                    )
+
 
                     self.df_performance2 = df_raw1[onoff].copy()
 
