@@ -27,10 +27,10 @@ col_groups1 = ['사업_부처명m',
                '연구비_등급1', '연구비_등급2', '연구비_등급4'
                ]
 
-fig_list = ntis1.make_pdf(prefix='test1',
-                          #col_groups_fund=['연구비_등급1', '연구비_등급2', '연구비_등급4'],
-                          col_groups=col_groups1,
-                          onoff_condition=on1)
+fig_list = ntis1.analyis(prefix='test1',
+                         #col_groups_fund=['연구비_등급1', '연구비_등급2', '연구비_등급4'],
+                         col_groups=col_groups1,
+                         onoff_condition=on1)
 
 t2 = time.time() - t1
 
