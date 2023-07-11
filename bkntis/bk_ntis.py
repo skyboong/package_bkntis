@@ -1,14 +1,17 @@
 """
-NITS를 분석하는 기본 클래스를 정의한다.
+NITS를 분석하는 기본 클래스를 정의 한다.
 2022.4.13(Wed)
 2023.6.19(Mon)
 
 """
+print("Welcome to bk_ntis")
 #sys.path.append("/Users/bk/Dropbox/bkmodule2019/")
 
 import os
 import glob
 import time
+import datetime
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -20,10 +23,11 @@ from .graph import bk_graph_plotly as bgp
 from .util import bk_ntis_find as bnf
 from .util import bk_util as bu
 
-print("Test4 : 임포트 수정 : bk_ntis.py")
+# print("Test4 : 임포트 수정 : bk_ntis.py")
 
 col_group = '연구비_등급4'
 raw_symbols = SymbolValidator().values
+
 
 def f_q25(x):
     return x.quantile(q=0.25)
@@ -53,10 +57,11 @@ class NTIS():
         :param filename: 피클파일이어야 함.
         :param name_org:
         """
-
         t1 = time.time()
 
         self.df = None
+        self.df_performance = None
+        self.df_performance2 = None
 
         if df is not None:
             self.df = df.copy()
@@ -81,6 +86,7 @@ class NTIS():
             self.pre_treatment4_security()
         t2 = time.time() - t1
         print(f"*** NTIS 객체 생성 : {t2:.1f} 초")
+        print(f"date : {datetime.datetime.today()}")
 
     def __repr__(self):
         class_name = type(self).__name__
@@ -119,66 +125,83 @@ class NTIS():
             return df
 
     def import_performance_data(self, filename=None, df=None, kind=1):
-        if df is not None:
-            self.df_performance = df
-        else:
-            if kind == 1 :
-                df = self.import_file(filename=filename)
-                if df is not None:
-                    self.df_performance = df
-                    print(f"* imported {self.df_performance.shape[0]:,}개 임포트 완료하였습니다.")
-                    df_raw1 = df
-                    # 보안과제 정보 알려주기
-                    ## 체크 : 보안과제 제외, 전체 논문수 대비 보안과제 논문의 비율 체크
+        """
+        성과정보 임포트하는 메소드
+        :param filename:
+        :param df:
+        :param kind:
 
-                    a1 = len(df_raw1.index)
+        1. 논문 성과  self.df_performance1
 
-                    onoff1 = df_raw1['성과발생년도'] != '보안과제의 성과정보'
-                    a2 = onoff1.sum()
-
-                    onoff_s = df_raw1['성과발생년도'] == '보안과제의 성과정보'
-                    a3 = onoff_s.sum()
-
-                    # 3116
-                    # 8437
-
-                    ## 체크 : 기여율, 기여율 0 제외
-
-                    onoff2 = df_raw1['기여율(확정)'] == 0
-                    a4 = onoff2.sum()
-
-                    onoff3 = df_raw1['기여율(확정)'] > 0
-                    a5 = onoff3.sum()
-
-                    # 보안과제가 아니고, 기여율도 0 초과하는 과제수는 ?
-                    onoff = onoff1 & onoff3
-                    a6 = onoff.sum()
-
-                    # 307513
-                    # 730741
-
-                    print(
-                        f"* 전체 논문({a1:,}건) 중 보안과제의 논문 {a3:,}건({100 * a3 / a1:.1f}%)과 "
-                        f"기여율 0% 논문 {a4:,}건({100 * a4 / a1:.1f}%)을 "
-                        f"제외한 논문 {a5:,}건({100 * a5 / a1:.1f}%)을 분석 대상으로 하였다."
-                        f"(df_performance: 전체 raw data {self.df_performance.shape}, df_performance2 : 보안과제, 기여율 0 이상 논문 {self.df_performance2.shape})"
-                    )
-
-
-                    self.df_performance2 = df_raw1[onoff].copy()
-
-                else:
-                    self.df_performance = None
-                    print("* imported None")
+        :return:
+        """
+        if kind == 1 :
+            if df is not None:
+                self.df_performance1 = df
             else:
-                self.df_performance = None
+                df = self.import_file(filename=filename)
+                self.df_performance1 = df
+                print(f"* imported {self.df_performance1.shape[0]:,}개 임포트 완료하였습니다.")
 
+                # 보안과제 정보 알려주기
+                ## 체크 : 보안과제 제외, 전체 논문수 대비 보안과제 논문의 비율 체크
+                a1 = len(df.index)
+                onoff1 = df['성과발생년도'] != '보안과제의 성과정보'
+                a2 = onoff1.sum()
+
+                onoff_s = df['성과발생년도'] == '보안과제의 성과정보'
+                a3 = onoff_s.sum()
+
+                # 3116
+                # 8437
+                ## 체크 : 기여율, 기여율 0 제외
+                onoff2 = df['기여율(확정)'] == 0
+                a4 = onoff2.sum()
+
+                onoff3 = df['기여율(확정)'] > 0
+                a5 = onoff3.sum()
+
+                # 보안 과제가 아니고, 기여율도 0 초과하는 과제수는 ?
+                onoff = onoff1 & onoff3
+                a6 = onoff.sum()
+                self.df_performance1b = df[onoff].copy()
+
+                # 307513
+                # 730741
+
+                print(
+                    f"* 전체 논문({a1:,}건) 중 보안과제의 논문 {a3:,}건({100 * a3 / a1:.1f}%)과 "
+                    f"기여율 0% 논문 {a4:,}건({100 * a4 / a1:.1f}%)을 "
+                    f"제외한 논문 {a5:,}건({100 * a5 / a1:.1f}%)을 분석 대상으로 하였다.")
+                print(f"* 전체 {df.shape} -> 보안과제, 기여율 0 % 이상 논문 {self.df_performance1b.shape})"
+                )
+        else:
+            self.df_performance = None
+
+    def plot_performance(self, df=None):
+        if df is None and self.df_performance2 is not None:
+            df = self.df_performance2
 
 
 
     def show_info(self):
         print("shape = ", self.df.shape)
         print(f"memory usage =  {self.df.memory_usage(deep=True).sum() / (1024 * 1024):.2f} MB")
+
+    def show_target_columns(self):
+        target_columns = [
+          '사업_부처명',
+          '사업_부처명m',
+          '연구수행주체',
+          '과제수행기관명',
+          '지역', '지역2', '지역3',
+          '6T관련기술-대', '과학기술표준분류1-대', '중점과학기술분류-대',
+          '연구개발단계',
+          '연구책임자성별',
+          '보안과제3',
+          '연구비_등급1', '연구비_등급2', '연구비_등급4']
+        print("* target columns >>")
+        print(target_columns)
 
     def pre_treatment1_fund(self):
         """작업 편의를 위해서 전처리함"""
@@ -274,7 +297,7 @@ class NTIS():
 
         self.df = df_raw
 
-    def pre_treatment2_name_org(self, name_org='해양수산부'):
+    def pre_treatment2_name_org(self, df=None, col_dp='사업_부처명', name_org='해양수산부'):
         """
         사업 부처명 정리
         :return:
@@ -349,20 +372,27 @@ class NTIS():
             else:
                 return '나머지 부처'
 
-        dfc = self.df
-        dfc['사업_부처명2'] = dfc['사업_부처명'].map(lambda x: change_name(x, dic2=dic1, etc=etc_dept))
-        dfc['사업_부처명3'] = dfc['사업_부처명'].map(lambda x: change_name3(x, name_org=name_org))
+
+        if df is None and self.df is not None:
+            df = self.df
+        else:
+            print("(warning !) self.df is None")
+            return None
+
+        #dfc = self.df
+        df[f'{col_dp}2'] = df[col_dp].map(lambda x: change_name(x, dic2=dic1, etc=etc_dept))
+        df[f'{col_dp}3'] = df[col_dp].map(lambda x: change_name3(x, name_org=name_org))
 
         #  1999년 부처명 부터 정리함
         #  지시경제부 -> 산업통상자원부
-        # dfc['사업_부처명4'] = dfc['사업_부처명'].map(lambda x: change_name(x=x, dic2=dic_b, etc=[]))
-        dfc['사업_부처명4'] = dfc['사업_부처명'].map(lambda x: change_name(x=x, dic2=dic_b, etc=etc_dept2))
+        # dfc['사업_부처명4'] = dfc[col_dp].map(lambda x: change_name(x=x, dic2=dic_b, etc=[]))
+        df[f'{col_dp}4'] = df[col_dp].map(lambda x: change_name(x=x, dic2=dic_b, etc=etc_dept2))
 
         # major 부처명 표기
-        dfc['사업_부처명m'] = dfc['사업_부처명'].map(lambda x: change_name(x=x, dic2=dic_m, etc=etc_dept_m))
+        df[f'{col_dp}m'] = df[col_dp].map(lambda x: change_name(x=x, dic2=dic_m, etc=etc_dept_m))
         print(f"-- 사업_부처명m : NTIS 에 입력되어 있는 사업_부처명은 2012년 기준으로 되어 있음. 이것을 2020년 기준으로 변경함{dic_m}")
 
-        self.df = dfc
+        self.df = df
 
     def pre_treatment3_region(self):
         """
@@ -569,7 +599,8 @@ class NTIS():
 
         df_table = df_raw.groupby([PY])[col_fund2].agg(
             ['count', 'sum', 'mean', 'median', np.min, np.max, f_q90, f_q99])
-        fig = bgp.make_graph_line(df=df_table[colname].T,
+        df_g = df_table[colname].T
+        fig = bgp.make_graph_line(df=df_g,
                                title=title2,
                                title_font_size=title_font_size,
                                unit='',
@@ -590,9 +621,13 @@ class NTIS():
             for fig in fig_list:
                 fig.show()
         elif output == 'file':
-            for i, fig in enumerate(fig_list, start=1):
-                fn = filename + f'_{i:02d}.pdf'
-                fig.write_image(fn)
+            if filename is not None:
+                for i, fig in enumerate(fig_list, start=1):
+                    fn = str(filename) + f'_{i:02d}.pdf' # pathlib 문자열로 변환
+
+                    fig.write_image(fn)
+
+        return  {1:{'df':df_table1, 'fig':fig_list[0]}, 2:{'df': df_g, 'fig': fig_list[1]}}
 
 
 
@@ -955,6 +990,7 @@ class NTIS():
                 #print(f"{fn} was saved")
 
     def plot_2(self,
+               df=None,
                col_group='연구비_등급1', col_fund='정부연구비_조', col_fund2='정부연구비_억',
                output='screen', filename='',
                PY='제출년도',
@@ -964,38 +1000,57 @@ class NTIS():
                text_cagr_font_size=10,
                width_string=200,
                df_null_count=None,
-               include_count_sum='both'):
+               include_count_sum='both',
+               year_gap=4):
         """
         연구비 등급1은 NTIS 분석 보고서에 등장하는 기준 준용
 
         :param col_group: 연구비_등급1/2/3/4, 보안과제, 사업_부처명4
         :param col_fund: 정부연구비_조,
+
+        gear_gap : 4 는 최근 5년
         :return:
 
         2023.6.13 수정
         """
+        if df is None:
+            df_raw = self.df
+        else:
+            df_raw = df
 
-        df_raw = self.df
+        return_dic = {}
+
         fig_list = []
 
         # null data 현황
         if df_null_count is not None:
+            if col_group in df_null_count.index:
+                df_g = df_null_count.loc[col_group, :]
+            else:
+                raise Exception("에러 : df_null_count 검토 바랍니다. ")
+
+        else:
+            df_null_count = self.make_null_table()
             df_g = df_null_count.loc[col_group, :]
-            fig0 = bgp.make_graph_bar2(df_g,
-                                  width=0.5,
-                                  title=f'{fig_no}-0 {col_group} 널 데이터 현황(null data) ',
-                                  precision=1,
-                                  orientation='v',
-                                  # height=1800,
-                                  tickfont_size=5,
-                                  unit=" % "
-                                  # yaxes_title=f'널 비율(%) '
-                                  )
-            #fig.write_image(prefix + f'_null_{col_group1}.pdf')
-            fig_list.append(fig0)
+
+        fig0 = bgp.make_graph_bar2(df_g,
+                                   width=0.5,
+                                   title=f'{fig_no}-0 {col_group} 년도별 유효 데이터 비율(%) ',
+                                   precision=1,
+                                   orientation='v',
+                                   # height=1800,
+                                   tickfont_size=5,
+                                   unit=" % "
+                                   # yaxes_title=f'널 비율(%) '
+                                   )
+        # fig.write_image(prefix + f'_null_{col_group1}.pdf')
+        #fig_list.append(fig0)
+        return_dic_null = {'df': df_g, 'fig': fig0}
+        return_dic['null'] = return_dic_null
 
         if include_count_sum in ['money', 'both'] :
-            fig_list1 = self.plot_2a(col_group=col_group,
+            #fig_list1 = self.plot_2a(col_group=col_group,
+            return_dic_m = self.plot_2a(col_group=col_group,
                     col_fund=col_fund,
                     col_fund2=col_fund2,
                     output=output,
@@ -1007,11 +1062,13 @@ class NTIS():
                     text_cagr_font_size=text_cagr_font_size,
                     width_string=width_string,
                     agg_function='sum',  fig_start_no=1)
-            fig_list.extend(fig_list1)
+            #fig_list.extend(fig_list1)
+            return_dic['m'] = return_dic_m
 
         if include_count_sum in ['count', 'both']:
             no_fig_list = len(fig_list)
-            fig_list2 = self.plot_2a(col_group=col_group,
+            #fig_list2 = self.plot_2a(col_group=col_group,
+            return_dic_c = self.plot_2a(col_group=col_group,
                                  col_fund=col_fund,
                                  col_fund2=col_fund2,
                                  output=output,
@@ -1023,18 +1080,34 @@ class NTIS():
                                  text_cagr_font_size=text_cagr_font_size,
                                  width_string=width_string,
                                  agg_function='count', fig_start_no=1) #no_fig_list+1)
-            fig_list.extend(fig_list2)
+            #fig_list.extend(fig_list2)
+            return_dic['c'] = return_dic_c
+
+
+
+
+
+        fig_list=[]
+        for k, v in return_dic.items():
+            if k == 'null':
+                fig_list.append(v['fig'])
+            else:
+                for k2, v2 in v.items():
+                    fig_list.append(v2['fig'])
+        print(f"len(fig_list)={len(fig_list)}")
 
         # file name 이 문자열로 입력되어 있다면 파일로 저장해 주기
         if (output == 'file') or (filename != ''):
             for i, fig in enumerate(fig_list, start=1):
-                fn = filename + f'_{i:02d}.pdf'
+                fn = str(filename) + f'_{i:02d}.pdf'
                 fig.write_image(fn)
                 #print(f"{fn} was saved")
         elif output == 'screen':
             for fig in fig_list:
                 fig.show()
-        return fig_list
+
+        return return_dic
+
 
 
     def plot_2a(self,
@@ -1051,7 +1124,8 @@ class NTIS():
                 width_string=200,
                 df_null_count=None,
                 agg_function ='sum',
-                fig_start_no = 1):
+                fig_start_no = 1,
+                year_gap=4) -> dict:
         """
         2023.6.12(Monday)
         """
@@ -1082,10 +1156,6 @@ class NTIS():
 
             df_table = df_raw.groupby([col_group, PY])[col_fund2].agg(agg_function).unstack(fill_value=0)
 
-            df_table_no1 = df_table.loc[:, year1:year2]
-            df_table_no2 = df_table_no1[df_table_no1.sum(axis=1) > 0]
-            s_sum1 = df_table.sum(axis=1)
-            s_sum2 = df_table_no2.sum(axis=1)
         else:
             name1 = '과제수'
 
@@ -1097,12 +1167,25 @@ class NTIS():
             unit2 = '개'
             memo1 = '1억당 과제수(개)'
             df_table = df_raw.groupby([col_group, PY])[col_fund].agg(agg_function).unstack(fill_value=0)
-            df_table_no1 = df_table.loc[:, year1:year2]
-            df_table_no2 = df_table_no1[df_table_no1.sum(axis=1) > 0]
-            s_sum1 = df_table.sum(axis=1)
-            s_sum2 = df_table_no2.sum(axis=1)
 
 
+        # 최근 5년
+        df_table_no1 = df_table.loc[:, year1:year2]
+        df_table_no2 = df_table_no1[df_table_no1.sum(axis=1) > 0]
+        s_sum1 = df_table.sum(axis=1)
+        s_sum2 = df_table_no2.sum(axis=1)
+
+        # 최근년도 : 5년 단위
+        if year2 - year_gap >= year1:
+            year1_new = year2 - year_gap
+        else:
+            year1_new = year1
+
+        df_table_no2_h = df_table.loc[:, year1_new:year2]
+        df_table_no2_h2 = df_table_no2_h[df_table_no2_h.sum(axis=1) > 0]
+        s_sum3 = df_table_no2_h2.sum(axis=1)
+
+        return_dic = {}
 
         fig = bgp.make_graph_line(df=df_graph,
                                   title=f"{fig_no}-{fig_start_no} {col_group} {name1} 추이",
@@ -1121,6 +1204,7 @@ class NTIS():
                                   figsize=figsize)
         fig_start_no += 1
         fig_list.append(fig)
+        return_dic[1] = {'df': df_graph, 'fig':fig}
 
         fig = bgp.make_graph_line(df=df_c2,
                                    title=f"{fig_no}-{fig_start_no} {col_group} {memo1}",
@@ -1139,6 +1223,7 @@ class NTIS():
                                    figsize=figsize)
         fig_start_no += 1
         fig_list.append(fig)
+        return_dic[2] = {'df': df_c2, 'fig': fig}
 
         fig = bgp.make_graph_bar2(df=df_graph.T,
                                title=f"{fig_no}-{fig_start_no} {col_group} {name1} 추이(Bar)",
@@ -1153,6 +1238,7 @@ class NTIS():
                                figsize=figsize)
         fig_start_no += 1
         fig_list.append(fig)
+        return_dic[3] = {'df': df_graph.T, 'fig':fig}
 
         fig = bgp.make_graph_bar2(df=df_graph.T,
                                title=f"{fig_no}-{fig_start_no} {col_group} {name1} 비율 추이(Bar)",
@@ -1167,8 +1253,10 @@ class NTIS():
                                figsize=figsize)
         fig_start_no += 1
         fig_list.append(fig)
+        return_dic[4] = {'df': df_graph.T, 'fig':fig}
 
-        fig = bgp.make_graph_bar2(df=df_table_no2,
+
+        fig = bgp.make_graph_bar2(df=df_table_no2_h2,
                                    orientation='h',
                                    barmode='group',
                                    width=width,
@@ -1183,8 +1271,9 @@ class NTIS():
                                    figsize=figsize)
         fig_start_no += 1
         fig_list.append(fig)
+        return_dic[5] = {'df': df_table_no2_h2, 'fig':fig}
 
-        fig = bgp.make_graph_bar2(df=df_table_no2,
+        fig = bgp.make_graph_bar2(df=df_table_no2_h2,
                                   orientation='h',
                                   barmode='stack',
                                   width=width,
@@ -1199,6 +1288,7 @@ class NTIS():
                                   figsize=figsize)
         fig_start_no += 1
         fig_list.append(fig)
+        return_dic[6] = {'df': df_table_no2_h2, 'fig':fig}
 
         # ------------------
         # Total :
@@ -1211,41 +1301,46 @@ class NTIS():
                            # pull_index=[6],
                            # pull_index_ratio=0.1,
                            # pull_index_ratio_default=0.01,
-                           title=f"{fig_no}-{fig_start_no} {col_group} {name1} (전체)",
+                           title=f"{fig_no}-{fig_start_no} {col_group} {name1} ({year1}~{year2})",
                            title_font_size=title_font_size,
                            colormap_name=color_map,  # "tab20c",
                            figsize=figsize)
         fig_start_no += 1
         fig_list.append(fig)
-        if (year1 in df_table_no2.columns) and (year2 in df_table_no2.columns):
-            fig = bgp.make_pie(values=s_sum2,
-                           labels=s_sum2.index,
-                           text1=f"{name1}<br>({year1}-{year2})",
+        return_dic[7] = {'sr': s_sum1, 'fig':fig}
+
+        if (year1_new in df_table_no2.columns) and (year2 in df_table_no2.columns):
+            fig = bgp.make_pie(values=s_sum3,
+                           labels=s_sum3.index,
+                           text1=f"{name1}<br>({year1_new}-{year2})",
                            unit=unit1,
                            # pull_index=[6],
                            # pull_index_ratio=0.1,
                            # pull_index_ratio_default=0.01,
-                           title=f"{fig_no}-{fig_start_no} {col_group} {name1} ({year1}~{year2})",
+                           title=f"{fig_no}-{fig_start_no} {col_group} {name1} ({year1_new}~{year2})",
                            title_font_size=title_font_size,
                            colormap_name=color_map,  # "tab20c",
                            figsize=figsize)
             fig_start_no += 1
             fig_list.append(fig)
+            return_dic[8] = {'sr': s_sum3, 'fig':fig}
 
-        if year1 in df_table_no2.columns:
-            fig = bgp.make_pie(values=df_table_no2[year1],
+
+        if year1_new in df_table_no2.columns:
+            fig = bgp.make_pie(values=df_table_no2[year1_new],
                             labels=df_table_no2.index,
-                            text1=f"{name1}<br>({year1})",
+                            text1=f"{name1}<br>({year1_new})",
                             unit=unit1,
                             # pull_index=[6],
                             # pull_index_ratio=0.1,
                             # pull_index_ratio_default=0.01,
-                            title=f"{fig_no}-{fig_start_no} {col_group} {name1}({year1})",
+                            title=f"{fig_no}-{fig_start_no} {col_group} {name1}({year1_new})",
                             title_font_size=title_font_size,
                             colormap_name=color_map,  # "tab20c",
                             figsize=figsize)
             fig_start_no += 1
             fig_list.append(fig)
+            return_dic[9] = {'sr': df_table_no2[year1_new], 'fig':fig}
 
         if year2 in df_table_no2.columns:
             fig = bgp.make_pie(values=df_table_no2[year2],
@@ -1261,6 +1356,7 @@ class NTIS():
                             figsize=figsize)
             fig_start_no += 1
             fig_list.append(fig)
+            return_dic[10] = {'sr': df_table_no2[year2], 'fig':fig}
 
         #fig_list = [fig1, fig2, fig3, fig4, fig5, fig6, fig7, fig8, fig9, fig10, fig11, fig12, fig13]
 
@@ -1270,11 +1366,11 @@ class NTIS():
         elif output == 'file':
             for i, fig in enumerate(fig_list, start=1):
                 if fig is not None: # fig None 일 때 처리 2023.6.20
-                    fn = filename_prefix + f'_{i:02d}.pdf'
+                    fn = str(filename_prefix) + f'_{i:02d}.pdf'
                     fig.write_image(fn)
                     #print(f"{fn} was saved")
 
-        return fig_list
+        return return_dic # fig_list
 
 
     def plot_3(self,
@@ -1323,24 +1419,43 @@ class NTIS():
 
 
     def plot_histogram(self,
-                         critical_number_list=[10,20,100],
-                         colname_data='정부연구비_억',
-                         colname_group='제출년도',
-                         output='screen',
-                         filename='',
-                         title='',
-                         title_font_size=20,
-                         title2_font_size=10,
-                         #  color_map='Set3',
-                         figsize=(800,600)):
+                       df=None,
+                       critical_number_list=[10,20,100],
+                       colname_data='정부연구비_억',
+                       colname_group='제출년도',
+                       output='screen',
+                       filename='',
+                       title='',
+                       title_font_size=20,
+                       title2_font_size=10,
+                       #  color_map='Set3',
+                       figsize=(800,600),
+                       bins=[0, 1, 5, 10, 100, 500, np.inf],
+                       index_name = ['[1억원 미만)', '[1~5억)', '[5~10억)', '[10~100억)', '[100~500억)', '[500억 이상)'],
+                       color_map='Set3',
+                       precision=0,
+                       text_cagr_font_size=10,
+                       width_string=100,
+                       node_size=10,
+                       marker_line_width=1,
+                       marker_color="#ffffff",
+                       line_width=1,
+                       ):
         """
         :param critical_number: 정부연구비 기준
         :return:
         """
         fig_list = []
+        return_dic = {}
 
         # critical_number = 10  # 100억원 이상
-        df_raw = self.df
+        if df is None:
+            if self.df is not None:
+                df_raw = self.df
+            else:
+                raise  Exception("데이터 입력에 오류 발생하였으니, 체크 하셔요. ")
+
+        #
 
 
         fig = bgp.make_histogram2(df=df_raw,
@@ -1358,6 +1473,7 @@ class NTIS():
                                   figsize=figsize
                                   )
         fig_list.append(fig)
+
 
         for no_i, critical_number in enumerate(critical_number_list, start=2):
             df_raw_below = df_raw[df_raw[colname_data] <= critical_number]
@@ -1379,34 +1495,51 @@ class NTIS():
                                )
             fig_list.append(fig)
 
-        '''
-        df_raw_20_above = df_raw[df_raw[colname_data] > critical_number]
-        #text2 = "(0 < 범위 < {critical_number} 억원)"
-        text2 = f"({critical_number}<=  연구비 <= {df_raw_20_above[colname_data].max():.1f} 억원)"
-        text2a = f'<span style="font-size: {title2_font_size}px;">{text2}</span>'
-        fig = bgp.make_histogram2(df=df_raw_20_above,
-                               colname_data=colname_data,
-                               colname_group=colname_group,
-                               nbinsx=100,
-                               legend_size=8,
-                               # legend_title_size=5
-                               xaxes_title=colname_data,
-                               barmode='stack',
-                               title=f"{title} Histogram 3 ({critical_number} 이상",
-                               title_sub=text2a,
-                              #  color_map=color_map,
-                               figsize=figsize
-                               )
+
+        #'''
+        # 7/6, 7/10 task
+        dic1 = {}
+        years = df_raw[colname_group].unique()
+        for year in years:
+            # 년도별로 구분하기
+            df_temp = df_raw[df_raw[colname_group] == year]
+            # print(df_temp.shape)
+            sr1 = df_temp[colname_data]
+            # numpy 이용하여 만듦
+            hist, bin_edges = np.histogram(sr1, bins=bins)
+            dic1[year] = hist
+        df_hist_table = DataFrame(dic1, index=index_name)
+        df_g = df_hist_table
+        fig = bgp.make_graph_line(df=df_g,
+                                  title=f"{title} Histogram 5",
+                                  title_font_size=title_font_size,
+                                  unit='',
+                                  precision=precision,
+                                  yaxes_title='과제수',
+                                  color_map=color_map,
+                                  cagr=False,
+                                  text_cagr_font_size=text_cagr_font_size,
+                                  width_string=width_string,
+                                  node_size=node_size,
+                                  marker_line_width=marker_line_width,
+                                  marker_color=marker_color,
+                                  line_width=line_width,
+                                  figsize=figsize)
         fig_list.append(fig)
-        '''
+        return_dic[5] = {'df': df_hist_table, 'fig':fig}
+        #'''
+
 
         if output == 'screen':
             for fig in fig_list:
                 fig.show()
         elif output == 'file':
-            for i, fig in enumerate(fig_list, start=1):
-                fn = filename + f'_{i:02d}.pdf'
-                fig.write_image(fn)
+            if filename is not None:
+                for i, fig in enumerate(fig_list, start=1):
+                    fn = str(filename) + f'_{i:02d}.pdf'
+                    fig.write_image(fn)
+
+        return return_dic
 
 
     def plot_5_horizontal_bar(self,
@@ -1528,55 +1661,94 @@ class NTIS():
                       figsize=(800,600),
                       title='',
                       output='file',
+                      yaxes_title=None,
                       filename=''):
 
         df_raw = self.df
+        return_dic = {}
         fig_list = []
+
         fig = bgp.make_box_plot3(df_raw,
                                  col1=colname_group,
                                  col2=colname_data,
                                  unit=1,
                                  title=f"{title} Box Plot {colname_group} vs {colname_data}",
-                                 color_map='jet', figsize=figsize)
+                                 color_map='jet', figsize=figsize,
+                                 yaxes_title=yaxes_title)
         fig_list.append(fig)
-
+        return_dic[1] = {'df':None, 'fig':fig}
         if output == 'screen':
             for fig in fig_list:
                 fig.show()
         elif output == 'file':
-            for i, fig in enumerate(fig_list, start=1):
-                fn = filename + f'_{i:02d}.pdf'
-                fig.write_image(fn)
+            if filename is not None:
+                for i, fig in enumerate(fig_list, start=1):
+                    fn = str(filename) + f'_{i:02d}.pdf'
+                    fig.write_image(fn)
+        return return_dic
 
-    def plot_null_data(self, filename='ntis_null', PY='제출년도', TF_merger=False, TF_fig=True, fig_no=1, precision=3)->DataFrame:
+    def plot_null_data(self, df=None, filename='ntis_null', PY='제출년도',
+                       TF_merger=False, TF_fig=True, fig_no=1, precision=3,
+                       colorscale='blues') -> DataFrame:
+        """
+        널 데이터 현황
+        filename 이 None 이면 pdf 파일 생성하지 않기
+
+        """
+        # print(">>> plot_null_data()")
         figsize = (1000, 1800)
-        if self.df is not None:
+        if df is None and self.df is not None:
             df_raw = self.df.copy()
         else:
             return None
 
+        # fig1
         s_null = (~df_raw.isnull()).sum() / len(df_raw.index) * 100
-        #s_null
-        # s_null2 = s_null[s_null>0]
-        # s_null2
         df_temp = DataFrame(s_null)
         df_temp.index = [f"{i:3d} {each}" for i, each in enumerate(df_temp.index, start=1)]
-        df_temp2 = df_temp.sort_index(ascending=False)
+        df_fig_a11 = df_temp.sort_index(ascending=False)
 
-        s_null = (df_raw.isnull()).sum() / len(df_raw.index) * 100
-        # s_null
-        # s_null2 = s_null[s_null>0]
-        # s_null2
+        # fig2
+        # s_null = (df_raw.isnull()).sum() / len(df_raw.index) * 100
+        s_null = (df_raw.isnull()).sum()
         df_temp = DataFrame(s_null)
         df_temp.index = [f"{i:3d} {each}" for i, each in enumerate(df_temp.index, start=1)]
         df_temp3 = df_temp.sort_index(ascending=False)
         # null 이 0인 것은 제외하기
-        df_temp4 = df_temp3[~(df_temp3.loc[:,0]==0)]
+        df_fig_a12 = df_temp3[~(df_temp3.loc[:,0]==0)]
 
-        # df_temp2
+        # fig3
+        s_null = (df_raw.isnull()).sum() / len(df_raw.index) * 100
+        #s_null = (df_raw.isnull()).sum()
+        df_temp = DataFrame(s_null)
+        df_temp.index = [f"{i:3d} {each}" for i, each in enumerate(df_temp.index, start=1)]
+        df_temp3 = df_temp.sort_index(ascending=False)
+        # null 이 0인 것은 제외하기
+        df_fig_a13 = df_temp3[~(df_temp3.loc[:,0]==0)]
+
+        # fig4
+        #PY = '제출년도'
+        s1 = df_raw[PY].value_counts()
+        s1a = s1.sort_index()
+        Y1 = s1.index.min()
+        Y2 = s1.index.max()
+        df_count = df_raw.groupby([PY]).agg('count').T
+        df_count2 = df_count.divide(s1a, axis=1)
+        df_count3 = 100 * df_count2
+
+        # 제출년도 포함 시켜주기 : 모두 100 으로 설정해 주기
+        df_1 = DataFrame([[100] * len(df_count3.columns)],
+                         columns=df_count3.columns,
+                         index=[PY])
+        df_count3 = pd.concat([df_1, df_count3], axis=0)
+        # index 조정
+        df_fig_a14 = df_count3.copy()
+        df_fig_a14.index = [f" {i}. {each}" for i, each in enumerate(df_fig_a14.index, start=1)]
+
         size = 15
         if TF_fig == True:
-            fig = bgp.make_graph_bar2(df_temp2,
+            fig_list = []
+            fig = bgp.make_graph_bar2(df_fig_a11,
                                   width=0.5,
                                   title=f'{fig_no}-1 데이터 비율(전체)',
                                   title_sub=f'<span style="font-size: {size}px;">{df_raw.shape[0]:,}개, {len(s_null.index)}개 항목</span>',
@@ -1587,49 +1759,45 @@ class NTIS():
                                   figsize=figsize,
                                   # yaxes_title=f'널 비율(%) '
                                   )
-            fig.write_image(f'{filename}_1.pdf')
+            fig_list.append(fig)
 
-            fig = bgp.make_graph_bar2(df_temp4,
+
+            if filename:
+                fig.write_image(f'{filename}_1.pdf')
+
+            fig = bgp.make_graph_bar2(df_fig_a12,
                                       width=0.5,
-                                      title=f'{fig_no}-2 널 존재하는 컬럼 추출 - 데이터 비율(전체)',
-                                      title_sub=f'<span style="font-size: {size}px;">{df_raw.shape[0]:,}개, {len(df_temp4.index)}개 항목</span>',
-                                      precision=precision,
+                                      title=f'{fig_no}-2 널 개수(전체)',
+                                      title_sub=f'<span style="font-size: {size}px;">{df_raw.shape[0]:,}개, {len(df_fig_a12.index)}개 항목</span>',
+                                      precision=0,
                                       orientation='h',
                                       tickfont_size=5,
-                                      unit=" % ",
+                                      unit=" 개",
                                       figsize=figsize,
                                       # yaxes_title=f'널 비율(%) '
                                       )
-            fig.write_image(f'{filename}_2.pdf')
+            if filename:
+                fig.write_image(f'{filename}_2.pdf')
+            fig_list.append(fig)
 
+            fig = bgp.make_graph_bar2(df_fig_a13,
+                                      width=0.5,
+                                      title=f'{fig_no}-3 널 비율(전체)',
+                                      title_sub=f'<span style="font-size: {size}px;">{df_raw.shape[0]:,}개, {len(df_fig_a12.index)}개 항목</span>',
+                                      precision=precision,
+                                      orientation='h',
+                                      tickfont_size=5,
+                                      unit=" %",
+                                      figsize=figsize,
+                                      # yaxes_title=f'널 비율(%) '
+                                      )
+            if filename:
+                fig.write_image(f'{filename}_3.pdf')
+            fig_list.append(fig)
 
-        # null data
-        #PY = '제출년도'
-        s1 = df_raw[PY].value_counts()
-        s1a = s1.sort_index()
-
-        Y1 = s1.index.min()
-        Y2 = s1.index.max()
-
-        df_count = df_raw.groupby([PY]).agg('count').T
-        df_count2 = df_count.divide(s1a, axis=1)
-        df_count3 = 100 * df_count2
-
-        # 제출년도 포함 시켜주기 : 모두 100 으로 설정해 주기
-        df_1 = DataFrame([[100] * len(df_count3.columns)],
-                         columns=df_count3.columns,
-                         index=[PY])
-        df_count3 = pd.concat([df_1, df_count3], axis=0)
-
-        # index 조정
-        df_count4 = df_count3.copy()
-        df_count4.index = [f" {i}. {each}" for i, each in enumerate(df_count4.index, start=1)]
-
-        if TF_fig == True:
-            df_fig = df_count4
-            fig = bgp.make_heatmap(title=f"{fig_no}-3 데이터 비율(연도별 : {Y1}~{Y2})",
-                               df=df_fig,
-                               colorscale='blues',  # 'greens',
+            fig = bgp.make_heatmap(title=f"{fig_no}-4 데이터 비율(연도별 : {Y1}~{Y2})",
+                               df=df_fig_a14,
+                               colorscale=colorscale,  # 'greens',
                                textfont_size=3,
                                figsize=figsize,
                                margin=dict(l=20, r=20, t=20, b=20),
@@ -1638,31 +1806,34 @@ class NTIS():
                                colorbar_orientation='h',
                                colorbar_ticklen=2,
                                colorbar_tickfont_size=8,
-                               minimum_number=0.3,  # 이 숫자 아래는 텍스트 출력하지 않기
+                               minimum_number=0.3,  # 이 숫자 아래는 텍스트 출력하지 않기,
+
                                # x_min=1998,
                                # x_max=2021,
                                )
-            fig.write_image(f'{filename}_3.pdf')
+            if filename:
+                fig.write_image(f'{filename}_4.pdf')
+            fig_list.append(fig)
+        else:
+            fig_list=[None,None,None,None]
 
-        if (TF_fig == True) and (TF_merger == True):
-            merger = PdfMerger()
-            for fn in sorted([f'{filename}_1.pdf', f'{filename}_2.pdf', f'{filename}_3.pdf']):
-                merger.append(fn)
-            fname2 = bu.make_new_name(f'total_{filename}', 'pdf')
-            merger.write(fname2)
-            merger.close()
+        if filename:
+            if (TF_fig == True) and (TF_merger == True):
+                merger = PdfMerger()
+                for fn in sorted([f'{filename}_1.pdf', f'{filename}_2.pdf', f'{filename}_3.pdf',  f'{filename}_4.pdf']):
+                    merger.append(fn)
+                fname2 = bu.make_new_name(f'total_{filename}', 'pdf')
+                merger.write(fname2)
+                merger.close()
 
-        return df_count3
-
-
-
-
+        return {1: {'df': df_fig_a11, 'fig': fig_list[0]},
+                2: {'df': df_fig_a12, 'fig': fig_list[1]},
+                3: {'df': df_fig_a13, 'fig': fig_list[2]},
+                4: {'df': df_fig_a14, 'fig': fig_list[3]} }
 
     def make_table_ptn(self, df=None,
                            column_index_list=['사업_부처명', '사업명', '내역사업명'],
                            column_search='사업명',
-
-
                            column_FUND='정부연구비(원)',
                            ptn_list=[],
                            filename=None, # 'ex_ptn1.xlsx',
@@ -1697,18 +1868,24 @@ class NTIS():
             print(">>> ptn_list is empty !")
             return None
 
-
-    def make_pdf(self, filename_prefix='prefix_',
-                 year1=None, year2=None, PY='제출년도',
-                 color_map='tab20c', figsize=(800,600),
+    # make_pdf -> analyis
+    def analyis(self,
+                kind='A',
+                dir_name=None,
+                filename_prefix='',
+                include_count_sum='money',
+                year1=None, year2=None,
+                PY='제출년도',
+                color_map='tab20c',
+                figsize=(800,600),
                 col_fund1='정부연구비_조',
                 col_fund2='정부연구비_억',
                 col_groups_fund=['연구비_등급1'],  # , '연구비_등급2', '연구비_등급4'],
-                col_groups=[
+                target_columns=[
                           # '사업_부처명',
                             '사업_부처명m',
                           #  '연구수행주체',
-                            '과제수행기관명',
+                          #  '과제수행기관명',
                           #  '지역', '지역2', '지역3',
                           #  '6T관련기술-대', '과학기술표준분류1-대', '중점과학기술분류-대',
                           #  '연구개발단계',
@@ -1716,20 +1893,34 @@ class NTIS():
                           #  '보안과제3',
                           #  '연구비_등급1', '연구비_등급2', '연구비_등급4'
                         ],
-                 title_font_size=20,  text_cagr_font_size=10, width_string=200,
-                 critical_number_list=[10,20,100], # 10억, 20억, 100억
-                 range_l=None, range_r=None,
-                 onoff_condition=['null', 'fund_trend1',
-                                  'fund_histogram', 'fund_boxplot',
-                                  'fund_trend2',
-                                  'col_groups'],
-                 onoff_name='A'):
+                title_font_size=20, text_cagr_font_size=10, width_string=200,
+                critical_number_list=[10,20,100],  # 10억, 20억, 100억
+                range_l=None, range_r=None,
+                #onoff_condition=['null', 'fund_trend1',
+                #                 'fund_histogram', 'fund_boxplot',
+                #                 'fund_trend2',
+                #                 ''],
+                year_gap=4,
+                pdf_save=False,
+                ) -> dict:
         """
-        2023.5.24
-        2023.6.14
+        분석을 수행한다.
+
+        pdf_save : True이면 pdf 파일을 생성한다.
+
         """
-        print(">>> make_pdf()")
+        print(">>> analysis()")
         # 전체 집행액, 과제수
+
+
+        return_dic = dict() # 리턴할 값
+
+        if dir_name is not None:
+            pdf_dir_path = Path(dir_name)
+        else:
+            pdf_dir_path = Path('pdf')
+        pdf_dir_path.mkdir(parents=True, exist_ok="True")
+
 
         if year1 is None:
             year1 = self.df[PY].min()
@@ -1739,95 +1930,158 @@ class NTIS():
         fig_no_name = 'A1'
 
         # 작업편의를 위해서 만듦
-        if onoff_name=='A':
+        if kind =='A':
             onoff_condition = ['null', 'fund_trend1', 'fund_histogram', 'fund_boxplot']
-        elif onoff_name=='A1':
+        elif kind =='A1':
             onoff_condition = ['null']
-        elif onoff_name == 'AB':
-            onoff_condition = ['null', 'fund_trend1', 'fund_histogram', 'fund_boxplot', 'col_groups']
-        elif onoff_name == 'B':
-            onoff_condition = ['col_groups']
+        elif kind =='A2':
+            onoff_condition = ['fund_trend1']
+        elif kind =='A3':
+            onoff_condition = ['fund_histogram']
+        elif kind =='A4':
+            onoff_condition = ['fund_boxplot']
+        elif kind == 'AB':
+            onoff_condition = ['null', 'fund_trend1', 'fund_histogram', 'fund_boxplot', '']
+        elif kind == 'B':
+            onoff_condition = ['target_columns']
+        else:
+            onoff_condition = []
+
+
+        if pdf_save is not None:
+            filename1 = pdf_dir_path / f'{filename_prefix}{fig_no_name}_1_null_total'
+        else:
+            filename1 = None
 
         # 1 널 데이터 현황
-        filename1 = f'{filename_prefix}{fig_no_name}_1_null_total'
         if 'null' in onoff_condition:
             print("(1) draw null")
-            df_count3 = self.plot_null_data(filename=filename1, TF_fig=True, fig_no=fig_no_name)
-        else:
-            df_count3 = self.plot_null_data(filename=filename1, TF_fig=False, fig_no=fig_no_name)
-            #print(f"df_count3.shape={df_count3.shape}")
+            dic_df_fig1 = self.plot_null_data(filename=filename1, TF_fig=True, fig_no=fig_no_name)
+            return_dic['A1'] = dic_df_fig1
+        #else:
+        #    dic_df_fig1 = self.plot_null_data(filename=filename1, TF_fig=False, fig_no=fig_no_name)
+
+        # 널 정보
+        df_null_count = self.make_null_table(header_column='제출년도')
 
         # 2 연구비, 과제수 현황, 연구비 등급별 분포
         if 'fund_trend1' in onoff_condition:
             print("(2) fund_trend1()")
             fig_no_name = 'A2'
+            if pdf_save is not None:
+                filename = pdf_dir_path / f'{filename_prefix}{fig_no_name}_2_{col_fund1}_연구비_과제수'
+            else:
+                filename = None
+            dic_df_fig2 = self.plot_1(col_fund1=col_fund1, title1=f"{fig_no_name}-1 정부 연구개발 집행액과 과제수",
+                            col_fund2=col_fund2, title2=f"{fig_no_name}-2 정부 연구개발 집행액의 평균 및 중앙값",
+                            output='file',
+                            filename=filename,
+                            PY=PY,
+                            color_map=color_map,
+                            figsize=figsize,
+                            title_font_size=title_font_size,
+                            text_cagr_font_size=text_cagr_font_size,
+                            width_string=width_string,
+                            range_l=range_l, range_r=range_r)
+            return_dic['A2'] = dic_df_fig2
 
-            self.plot_1(col_fund1=col_fund1, title1=f"{fig_no_name}-1 정부 연구개발 집행액과 과제수",
-                        col_fund2=col_fund2, title2=f"{fig_no_name}-2 정부 연구개발 집행액의 평균 및 중앙값",
-                        output='file',
-                        filename=f'{filename_prefix}{fig_no_name}_2_{col_fund1}_연구비_과제수',
-                        PY=PY,
-                        color_map=color_map,
-                        figsize=figsize,
-                        title_font_size=title_font_size,
-                        text_cagr_font_size=text_cagr_font_size,
-                        width_string=width_string,
-                        range_l=range_l, range_r=range_r,
-                         )
         if 'fund_histogram' in onoff_condition:
             print('(3) fund_histogram()')
             fig_no_name = 'A3'
             #fig_no += 1
             # histogram
-            self.plot_histogram(critical_number_list=critical_number_list,
+            if pdf_save is not None:
+                filename = pdf_dir_path / f'{filename_prefix}{fig_no_name}_{col_fund2}'
+            else:
+                filename = None
+
+            dic_df_fig3 = self.plot_histogram(critical_number_list=critical_number_list,
                                   colname_data=col_fund2, # '정부연구비_억',
                                   colname_group=PY,
                                   output='file',
-                                  filename=f'{filename_prefix}{fig_no_name}_{col_fund2}',
+                                  filename=filename,
                                   #color_map=color_map,
                                   title=f"{fig_no_name} {col_fund2}",
                                   title_font_size=title_font_size,
                                   figsize=figsize,
                                   )
+            return_dic['A3'] = dic_df_fig3
 
         if 'fund_boxplot' in onoff_condition:
             print('(4) fund_boxplot()')
             fig_no_name = 'A4'
             # box_plot
-            self.plot_box_plot(colname_group=PY, colname_data=col_fund2,
+            if pdf_save is not None:
+                filename = pdf_dir_path / f'{filename_prefix}{fig_no_name}_{col_fund2}'
+            else:
+                filename = None
+
+            dic_df_fig4=self.plot_box_plot(colname_group=PY, colname_data=col_fund2,
                           figsize=figsize,
                           title=f"{fig_no_name}-{col_fund2}",
-                          filename=f'{filename_prefix}{fig_no_name}_{col_fund2}',
+                          filename=filename,
+                          yaxes_title=f'{col_fund2}',
                           output='file')
+            return_dic['A4'] = dic_df_fig4
 
-
-        # 그림번호 3 이상
         fig_no_name = 'B'
-        if 'col_groups' in onoff_condition:
+        if 'target_columns' in onoff_condition:
             # col_group 별 집행 현황 분석
-            for each_fig_no, col_group1 in enumerate(col_groups, start=1):
-                print(f"{each_fig_no} : {col_group1}")
+            for each_fig_no, col_group1 in enumerate(target_columns, start=1):
+                print(f"*** 분석 B - {each_fig_no} : {col_group1}")
                 #fig_no += 1
                 if col_group1 in self.df.columns:
-                    self.plot_2(col_group=col_group1, output='file', filename=f'{filename_prefix}{fig_no_name}_{each_fig_no:03d}_{col_group1}',
-                                fig_no=f"{fig_no_name}-{each_fig_no}",
+                    # 그림 번호 체계 : 컬럼의 번호 - B  : (ex) 1B, 2B, 3B ....
+                    fig_no1 = f"{each_fig_no}{fig_no_name}"
+                    return_dic[f'{each_fig_no}B']= self.plot_2(col_group=col_group1,
+                                output='file',
+                                filename= pdf_dir_path / f'{filename_prefix}{fig_no_name}_{each_fig_no:03d}_{col_group1}',
+                                #fig_no=f"{fig_no_name}-{each_fig_no}",
+                                fig_no=fig_no1,
                                 color_map=color_map, figsize=figsize, year1=year1, year2=year2,
-                                title_font_size=title_font_size, text_cagr_font_size=text_cagr_font_size, df_null_count=df_count3)
+                                title_font_size=title_font_size,
+                                text_cagr_font_size=text_cagr_font_size,
+                                df_null_count=df_null_count,
+                                include_count_sum=include_count_sum,
+                                year_gap=year_gap)
+
                 else:
                     print(f"(warning!) {col_group1} is not exist in df.columns")
 
+
         # filename_prefix로 시작하는 파일명 연결 하기
-        filenames1 = glob.glob(f'{filename_prefix}*.pdf')
-        filenames = sorted(filenames1)
-        merger = PdfMerger()
+        #path_filename = pdf_dir_path / f'{filename_prefix}*.pdf'
 
-        for fn in sorted(filenames):
-            merger.append(fn)
+        if pdf_save == True:
+            filenames1 = pdf_dir_path.glob(f'{filename_prefix}*.pdf')
+            filenames = sorted(list(filenames1))
+            merger = PdfMerger()
 
-        fname2 = bu.make_new_name(f'total_{filename_prefix}_{color_map}', 'pdf')
-        merger.write(fname2)
-        merger.close()
-        print(f" *** {fname2} was created ! *** ")
+            for fn in sorted(filenames):
+                merger.append(fn)
+
+            p1 = pdf_dir_path / f"total_{filename_prefix}_{color_map}"
+            fname2 = bu.make_new_name( str(p1), 'pdf')
+            merger.write(fname2)
+            merger.close()
+            print(f" *** {fname2} was created ! *** ")
+
+        return return_dic
+
+    def make_null_table(self, df=None, header_column='제출년도'):
+        """heder_column 별 데이터 비율 표 작성해 줌"""
+        if df is None:
+            df = self.df
+        PY = header_column
+        s1 = df[PY].value_counts()
+        s1a = s1.sort_index()
+        Y1 = s1.index.min()
+        Y2 = s1.index.max()
+        df_count = df.groupby([PY]).agg('count').T
+        df_count2 = df_count.divide(s1a, axis=1)
+        df_count3 = 100 * df_count2
+        return df_count3
+
 
 if __name__ == "__main__":
     print("bk_ntis.py")

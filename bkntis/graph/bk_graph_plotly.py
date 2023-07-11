@@ -16,6 +16,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from plotly.validators.scatter.marker import SymbolValidator
 from matplotlib import cm
+
 import matplotlib.colors as mcolor
 from PyPDF2 import PdfMerger 
 
@@ -1024,6 +1025,7 @@ def make_box_plot3(df, col1, col2,
                    paper_bgcolor='#ffffff',
                    #plot_bgcolor='#ffffff',
                    plot_bgcolor='rgba(230,236,245)',
+                   yaxes_title='',
                    figsize=(800,600),
                    ):
     # 2023.5.12
@@ -1073,6 +1075,8 @@ def make_box_plot3(df, col1, col2,
         width=figsize[0],
         height=figsize[1],
     )
+
+    fig.update_yaxes(title_text='' if yaxes_title is None else yaxes_title)
 
     print(f"* {title}")
     return fig
